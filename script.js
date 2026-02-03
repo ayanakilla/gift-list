@@ -2,34 +2,7 @@
 const STORAGE_KEY = 'giftlist-data-v2';
 
 // Начальные данные
-const INITIAL_DATA = [
-    {
-        id: 1,
-        name: "Наушники Sony WH-1000XM4",
-        user: "user1",
-        category: "Электроника",
-        priority: "high",
-        price: "25000",
-        link: "https://example.com/sony-headphones",
-        color: "Черный",
-        description: "Беспроводные наушники с шумоподавлением, давно хочу для работы и путешествий",
-        purchased: false,
-        date: new Date().toISOString()
-    },
-    {
-        id: 2,
-        name: "Набор косметики Chanel",
-        user: "user2",
-        category: "Косметика",
-        priority: "normal",
-        price: "12000",
-        link: "https://example.com/chanel-cosmetics",
-        color: null,
-        description: "Помада, тени и тушь из новой коллекции. Видела у подруги, очень понравилось качество",
-        purchased: false,
-        date: new Date().toISOString()
-    }
-];
+const INITIAL_DATA = [ ];
 
 // Загрузка данных
 function loadFromStorage() {
@@ -127,7 +100,7 @@ function createGiftElement(gift) {
     const giftCard = document.createElement('div');
     giftCard.className = `gift-card ${gift.user} ${gift.priority === 'high' ? 'priority-high' : ''} ${gift.purchased ? 'purchased' : ''}`;
     
-    const userLabel = gift.user === 'user1' ? 'Я' : 'Девушка';
+    const userLabel = gift.user === 'user1' ? 'Акила' : 'Аяна';
     const userClass = gift.user === 'user1' ? 'user1-badge' : 'user2-badge';
     const shortDescription = gift.description && gift.description.length > 100 
         ? gift.description.substring(0, 100) + '...' 
@@ -178,7 +151,7 @@ function formatPrice(price) {
 }
 
 function openGiftModal(gift) {
-    const userLabel = gift.user === 'user1' ? 'Я (Мужчина)' : 'Моя девушка';
+    const userLabel = gift.user === 'user1' ? 'Ахиллес' : 'Аяночка';
     const priorityLabel = { 'high': 'Высокий', 'normal': 'Обычный', 'low': 'Низкий' }[gift.priority] || 'Не указан';
     const date = new Date(gift.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     
@@ -293,4 +266,5 @@ document.addEventListener('DOMContentLoaded', () => {
     closeModal.addEventListener('click', () => modal.style.display = 'none');
     window.addEventListener('click', (e) => e.target === modal && (modal.style.display = 'none'));
     document.addEventListener('keydown', (e) => e.key === 'Escape' && modal.style.display === 'flex' && (modal.style.display = 'none'));
+
 });
