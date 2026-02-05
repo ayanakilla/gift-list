@@ -1,35 +1,13 @@
-// Конфигурация Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyAQaE-RUlP-9l9KqUPUV_2pNpON7Oat9NY",
-  authDomain: "wishlistforayanakilla.firebaseapp.com",
-  projectId: "wishlistforayanakilla",
-  storageBucket: "wishlistforayanakilla.firebasestorage.app",
-  messagingSenderId: "974705587471",
-  appId: "1:974705587471:web:640be35d883f65fddbfa7a",
-  measurementId: "G-XWR9K2VE37"
-};
-
-// Инициализация Firebase (версия совместимости)
-try {
-    firebase.initializeApp(firebaseConfig);
-    console.log("Firebase успешно инициализирован");
-} catch (error) {
-    console.error("Ошибка инициализации Firebase:", error);
-    // Если ошибка, показываем сообщение пользователю
-    document.querySelector('.gifts-container').innerHTML = 
-        '<div class="error">Ошибка подключения к базе данных. Пожалуйста, обновите страницу.</div>';
-}
-
-const db = firebase.firestore();
-
 // Элементы DOM
 const giftsContainer = document.querySelector('.gifts-container');
 const addBtn = document.getElementById('add-btn');
 const clearBtn = document.getElementById('clear-btn');
 const filterBtns = document.querySelectorAll('.filter-btn');
 const modal = document.getElementById('gift-modal');
-const closeModal = document.querySelector('.close-modal');
+const fullImageModal = document.getElementById('full-image-modal');
+const closeModal = document.querySelectorAll('.close-modal');
 const modalBody = document.querySelector('.modal-body');
+const fullImage = document.getElementById('full-image');
 
 // Формовые элементы
 const userSelect = document.getElementById('user-select');
@@ -39,55 +17,39 @@ const giftName = document.getElementById('gift-name');
 const giftPrice = document.getElementById('gift-price');
 const giftLink = document.getElementById('gift-link');
 const giftColor = document.getElementById('gift-color');
-const giftDescription = document.getElementById('gift-description');
+const giftPhoto = document.getElementById('gift-photo');
+const photoPreview = document.getElementById('photo-preview');
 
 // Статистические элементы
 const totalGiftsEl = document.getElementById('total-gifts');
 const user1GiftsEl = document.getElementById('user1-gifts');
 const user2GiftsEl = document.getElementById('user2-gifts');
 
-// Текущий фильтр
+// Текущий фильтр и фото
 let currentFilter = 'all';
-let unsubscribe = null;
+let currentPhoto = null;
 
-// Загрузка подарков из Firebase
+// Загрузка данных из LocalStorage
+const STORAGE_KEY = 'our-wishlist-v2';
+
+function loadFromStorage() {
+    try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveToStorage(gifts) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(gifts));
+}
+
+// Загрузка подарков
 function loadGifts() {
-    // Отписываемся от предыдущего слушателя
-    if (unsubscribe) {
-        unsubscribe();
-    }
-    
-    let query = db.collection('gifts').orderBy('date', 'desc');
-    
-    // Применяем фильтр
-    if (currentFilter === 'user1' || currentFilter === 'user2') {
-        query = query.where('user', '==', currentFilter);
-    } else if (currentFilter === 'priority') {
-        query = query.where('priority', '==', 'high');
-    }
-    
-    // Показываем загрузку
-    giftsContainer.innerHTML = '<div class="loading">Загрузка списка подарков...</div>';
-    
-    // Подписываемся на изменения в реальном времени
-    unsubscribe = query.onSnapshot((snapshot) => {
-        const gifts = [];
-        snapshot.forEach((doc) => {
-            const data = doc.data();
-            gifts.push({
-                id: doc.id,
-                ...data,
-                // Убедимся, что дата в правильном формате
-                date: data.date || new Date().toISOString()
-            });
-        });
-        
-        displayGifts(gifts);
-        updateStats(gifts);
-    }, (error) => {
-        console.error("Ошибка загрузки подарков:", error);
-        giftsContainer.innerHTML = '<div class="error">Ошибка подключения к базе данных</div>';
-    });
+    const gifts = loadFromStorage();
+    displayGifts(gifts);
+    updateStats(gifts);
 }
 
 // Обновление статистики
@@ -103,17 +65,20 @@ function updateStats(gifts) {
 
 // Отображение подарков
 function displayGifts(gifts) {
-    // Сортировка: сначала высокий приоритет, затем некупленные, потом купленные
-    gifts.sort((a, b) => {
-        // По приоритету (высокий приоритет идет первым)
+    // Фильтрация
+    let filteredGifts = gifts;
+    if (currentFilter === 'user1' || currentFilter === 'user2') {
+        filteredGifts = gifts.filter(g => g.user === currentFilter);
+    } else if (currentFilter === 'priority') {
+        filteredGifts = gifts.filter(g => g.priority === 'high');
+    }
+    
+    // Сортировка
+    filteredGifts.sort((a, b) => {
         if (a.priority === 'high' && b.priority !== 'high') return -1;
         if (a.priority !== 'high' && b.priority === 'high') return 1;
-        
-        // По статусу покупки (некупленные идут первыми)
         if (a.purchased && !b.purchased) return 1;
         if (!a.purchased && b.purchased) return -1;
-        
-        // По дате (новые идут первыми)
         return new Date(b.date) - new Date(a.date);
     });
     
@@ -121,44 +86,46 @@ function displayGifts(gifts) {
     giftsContainer.innerHTML = '';
     
     // Если нет подарков
-    if (gifts.length === 0) {
+    if (filteredGifts.length === 0) {
         const message = getEmptyMessage();
         giftsContainer.innerHTML = `<div class="empty-state">${message}</div>`;
         return;
     }
     
     // Добавление каждого подарка
-    gifts.forEach(gift => {
+    filteredGifts.forEach(gift => {
         const giftElement = createGiftElement(gift);
         giftsContainer.appendChild(giftElement);
     });
-}
-
-// Получение сообщения для пустого списка
-function getEmptyMessage() {
-    switch(currentFilter) {
-        case 'all': return 'Пока нет ни одного подарка в списке. Добавьте первый!';
-        case 'user1': return 'Для Ахиллеса пока нет желаний. Добавьте что-нибудь!';
-        case 'user2': return 'Для Аяночки пока нет желаний. Добавьте что-нибудь!';
-        case 'priority': return 'Нет подарков с высоким приоритетом.';
-        default: return 'Список пуст.';
-    }
 }
 
 // Создание элемента подарка
 function createGiftElement(gift) {
     const giftCard = document.createElement('div');
     giftCard.className = `gift-card ${gift.user} ${gift.priority === 'high' ? 'priority-high' : ''} ${gift.purchased ? 'purchased' : ''}`;
-    giftCard.dataset.id = gift.id;
     
     const userLabel = gift.user === 'user1' ? 'Ахиллесушка' : 'Аяночка';
     const userClass = gift.user === 'user1' ? 'user1-badge' : 'user2-badge';
     const purchasedText = gift.purchased ? ' (куплено)' : '';
     
-    // Обрезаем описание для карточки
-    const shortDescription = gift.description && gift.description.length > 100 
-        ? gift.description.substring(0, 100) + '...' 
-        : gift.description || 'Описание отсутствует';
+    // Фото или заглушка
+    let photoHtml = '';
+    if (gift.photo) {
+        photoHtml = `
+            <div class="gift-image-preview" data-image="${gift.photo}">
+                <img src="${gift.photo}" alt="${gift.name}" onclick="openFullImage('${gift.photo}')">
+            </div>
+        `;
+    } else {
+        photoHtml = `
+            <div class="gift-image-preview">
+                <div class="image-placeholder">
+                    <i class="fas fa-gift"></i>
+                    <small>Нет фото</small>
+                </div>
+            </div>
+        `;
+    }
     
     giftCard.innerHTML = `
         <div class="gift-header">
@@ -167,7 +134,10 @@ function createGiftElement(gift) {
         </div>
         ${gift.category ? `<div class="gift-category">${escapeHtml(gift.category)}</div>` : ''}
         ${gift.price ? `<div class="gift-price">${formatPrice(gift.price)} руб.</div>` : ''}
-        <div class="gift-description-short">${escapeHtml(shortDescription)}</div>
+        
+        <!-- ФОТО ВМЕСТО ОПИСАНИЯ -->
+        ${photoHtml}
+        
         ${gift.link ? `<a href="${gift.link}" target="_blank" class="gift-link" onclick="event.stopPropagation()"><i class="fas fa-external-link-alt"></i> Ссылка на товар</a>` : ''}
         <div class="gift-actions">
             <button class="action-btn purchased-btn" data-id="${gift.id}">
@@ -180,24 +150,19 @@ function createGiftElement(gift) {
         </div>
     `;
     
-    // Добавляем обработчик клика для открытия модального окна
+    // Обработчики
     giftCard.addEventListener('click', (e) => {
-        // Не открываем модалку если кликнули на кнопку или ссылку
-        if (!e.target.closest('.gift-actions') && !e.target.closest('.gift-link')) {
+        if (!e.target.closest('.gift-actions') && !e.target.closest('.gift-link') && !e.target.closest('.gift-image-preview img')) {
             openGiftModal(gift);
         }
     });
     
-    // Добавляем обработчики для кнопок
-    const purchasedBtn = giftCard.querySelector('.purchased-btn');
-    const deleteBtn = giftCard.querySelector('.delete-btn');
-    
-    purchasedBtn.addEventListener('click', (e) => {
+    giftCard.querySelector('.purchased-btn').addEventListener('click', (e) => {
         e.stopPropagation();
-        togglePurchaseStatus(gift.id, gift.purchased);
+        togglePurchaseStatus(gift.id);
     });
     
-    deleteBtn.addEventListener('click', (e) => {
+    giftCard.querySelector('.delete-btn').addEventListener('click', (e) => {
         e.stopPropagation();
         deleteGift(gift.id);
     });
@@ -205,35 +170,24 @@ function createGiftElement(gift) {
     return giftCard;
 }
 
-// Функция для экранирования HTML
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+// Открытие полноразмерного фото
+window.openFullImage = function(imageSrc) {
+    event.stopPropagation();
+    fullImage.src = imageSrc;
+    fullImageModal.style.display = 'flex';
 }
 
-// Форматирование цены
-function formatPrice(price) {
-    if (!price) return '';
-    const num = parseInt(price);
-    return isNaN(num) ? price : num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-}
-
-// Открытие модального окна с деталями подарка
+// Открытие модального окна с деталями
 function openGiftModal(gift) {
     const userLabel = gift.user === 'user1' ? 'Ахиллесушка' : 'Аяночка';
-    const priorityLabel = {
+    const priorityLabels = {
         'high': 'Высокий',
         'normal': 'Обычный',
         'low': 'Низкий'
-    }[gift.priority] || 'Не указан';
+    };
     
-    const purchasedLabel = gift.purchased ? 'Да (куплено)' : 'Нет';
-    const purchasedClass = gift.purchased ? 'style="color: #4bc0c0; font-weight: 600;"' : '';
-    
-    // Форматирование даты
-    const date = new Date(gift.date);
-    const formattedDate = date.toLocaleDateString('ru-RU', {
+    const priorityLabel = priorityLabels[gift.priority] || 'Не указан';
+    const date = new Date(gift.date).toLocaleDateString('ru-RU', {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
@@ -241,7 +195,25 @@ function openGiftModal(gift) {
         minute: '2-digit'
     });
     
+    // Фото для модального окна
+    let photoModalHtml = '';
+    if (gift.photo) {
+        photoModalHtml = `
+            <div class="modal-image-container">
+                <img src="${gift.photo}" alt="${gift.name}" class="modal-image" onclick="openFullImage('${gift.photo}')" style="cursor: pointer;">
+            </div>
+        `;
+    } else {
+        photoModalHtml = `
+            <div class="modal-image-container" style="background: #f5f5f5; padding: 20px; border-radius: 10px; text-align: center;">
+                <i class="fas fa-gift" style="font-size: 3rem; color: #ddd;"></i>
+                <p style="color: #999; margin-top: 10px;">Фото не добавлено</p>
+            </div>
+        `;
+    }
+    
     modalBody.innerHTML = `
+        ${photoModalHtml}
         <div class="modal-details">
             <div class="detail-row">
                 <div class="detail-label">Название:</div>
@@ -260,7 +232,7 @@ function openGiftModal(gift) {
                 <div class="detail-value">${priorityLabel}</div>
             </div>
             <div class="detail-row">
-                <div class="detail-label">Примерная цена:</div>
+                <div class="detail-label">Цена:</div>
                 <div class="detail-value">${gift.price ? formatPrice(gift.price) + ' руб.' : 'Не указана'}</div>
             </div>
             <div class="detail-row">
@@ -269,18 +241,13 @@ function openGiftModal(gift) {
             </div>
             <div class="detail-row">
                 <div class="detail-label">Куплено:</div>
-                <div class="detail-value" ${purchasedClass}>${purchasedLabel}</div>
+                <div class="detail-value" style="color: ${gift.purchased ? '#4bc0c0' : '#666'}">${gift.purchased ? 'Да' : 'Нет'}</div>
             </div>
             <div class="detail-row">
-                <div class="detail-label">Дата добавления:</div>
-                <div class="detail-value">${formattedDate}</div>
+                <div class="detail-label">Дата:</div>
+                <div class="detail-value">${date}</div>
             </div>
-            <div class="detail-row" style="flex-direction: column; align-items: flex-start;">
-                <div class="detail-label">Описание:</div>
-                <div class="detail-value" style="margin-top: 5px; white-space: pre-line;">${escapeHtml(gift.description || 'Описание отсутствует')}</div>
-            </div>
-            ${gift.link ? `
-            <div class="detail-row">
+            ${gift.link ? `<div class="detail-row">
                 <div class="detail-label">Ссылка:</div>
                 <div class="detail-value">
                     <a href="${gift.link}" target="_blank" class="modal-link">
@@ -294,38 +261,34 @@ function openGiftModal(gift) {
     modal.style.display = 'flex';
 }
 
-// Добавление нового подарка
-async function addGift() {
+// Добавление подарка
+function addGift() {
     const name = giftName.value.trim();
-    const user = userSelect.value;
-    
     if (!name) {
-        alert('Пожалуйста, введите название подарка');
+        alert('Введите название подарка');
         giftName.focus();
         return;
     }
     
+    const gifts = loadFromStorage();
     const newGift = {
+        id: Date.now(),
         name: name,
-        user: user,
+        user: userSelect.value,
         category: categorySelect.value || null,
         priority: prioritySelect.value,
         price: giftPrice.value.trim() || null,
         link: giftLink.value.trim() || null,
         color: giftColor.value.trim() || null,
-        description: giftDescription.value.trim() || null,
+        photo: currentPhoto, // Сохраняем фото вместо описания
         purchased: false,
         date: new Date().toISOString()
     };
     
-    try {
-        await db.collection('gifts').add(newGift);
-        clearForm();
-        // Не нужно вызывать loadGifts() - сработает автоматически через onSnapshot
-    } catch (error) {
-        console.error('Ошибка добавления подарка:', error);
-        alert('Ошибка при добавлении подарка');
-    }
+    gifts.push(newGift);
+    saveToStorage(gifts);
+    clearForm();
+    loadGifts();
 }
 
 // Очистка формы
@@ -334,130 +297,139 @@ function clearForm() {
     giftPrice.value = '';
     giftLink.value = '';
     giftColor.value = '';
-    giftDescription.value = '';
+    photoPreview.innerHTML = '';
+    currentPhoto = null;
     categorySelect.selectedIndex = 0;
     prioritySelect.selectedIndex = 0;
+    giftPhoto.value = '';
     giftName.focus();
 }
 
+// Управление фото
+function handlePhotoUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.match('image.*')) {
+        alert('Пожалуйста, выберите изображение');
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Изображение должно быть меньше 5MB');
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        currentPhoto = e.target.result;
+        
+        photoPreview.innerHTML = `
+            <img src="${currentPhoto}" class="preview-image" alt="Предпросмотр">
+            <button type="button" class="remove-photo" onclick="removePhoto()">
+                <i class="fas fa-times"></i> Удалить фото
+            </button>
+        `;
+    };
+    reader.readAsDataURL(file);
+}
+
+// Удаление фото
+window.removePhoto = function() {
+    currentPhoto = null;
+    photoPreview.innerHTML = '';
+    giftPhoto.value = '';
+}
+
 // Переключение статуса покупки
-async function togglePurchaseStatus(id, currentStatus) {
-    try {
-        await db.collection('gifts').doc(id).update({
-            purchased: !currentStatus
-        });
-        // Не нужно вызывать loadGifts() - сработает автоматически
-    } catch (error) {
-        console.error('Ошибка обновления подарка:', error);
-        alert('Не удалось обновить статус подарка');
+function togglePurchaseStatus(id) {
+    const gifts = loadFromStorage();
+    const index = gifts.findIndex(g => g.id === id);
+    if (index !== -1) {
+        gifts[index].purchased = !gifts[index].purchased;
+        saveToStorage(gifts);
+        loadGifts();
     }
 }
 
 // Удаление подарка
-async function deleteGift(id) {
-    if (!confirm('Вы уверены, что хотите удалить этот подарок из списка?')) {
-        return;
-    }
+function deleteGift(id) {
+    if (!confirm('Удалить этот подарок из списка?')) return;
     
-    try {
-        await db.collection('gifts').doc(id).delete();
-        // Не нужно вызывать loadGifts() - сработает автоматически
-    } catch (error) {
-        console.error('Ошибка удаления подарка:', error);
-        alert('Не удалось удалить подарок');
+    const gifts = loadFromStorage();
+    const filtered = gifts.filter(g => g.id !== id);
+    saveToStorage(filtered);
+    loadGifts();
+}
+
+// Вспомогательные функции
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatPrice(price) {
+    if (!price) return '';
+    const num = parseInt(price);
+    return isNaN(num) ? price : num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+function getEmptyMessage() {
+    switch(currentFilter) {
+        case 'all': return 'Пока нет подарков. Добавьте первый!';
+        case 'user1': return 'Для Ахиллеса пока нет желаний';
+        case 'user2': return 'Для Аяночки пока нет желаний';
+        case 'priority': return 'Нет подарков с высоким приоритетом';
+        default: return 'Список пуст';
     }
 }
 
 // Установка фильтра
 function setFilter(filter) {
     currentFilter = filter;
-    
-    // Обновление активной кнопки
     filterBtns.forEach(btn => {
-        if (btn.dataset.filter === filter) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
+        btn.classList.toggle('active', btn.dataset.filter === filter);
     });
-    
-    // Перезагрузка подарков с новым фильтром
     loadGifts();
 }
 
-// Проверка подключения к Firebase
-function checkFirebaseConnection() {
-    const connectionCheck = setTimeout(() => {
-        if (!document.querySelector('.gift-card') && !document.querySelector('.error')) {
-            giftsContainer.innerHTML = 
-                '<div class="error">Ожидание подключения к базе данных...</div>';
-        }
-    }, 3000);
-    
-    return connectionCheck;
-}
-
-// Инициализация приложения
+// Инициализация
 function init() {
-    // Проверяем подключение
-    const connectionTimeout = checkFirebaseConnection();
-    
-    // Загрузка подарков при загрузке страницы
+    // Загрузка данных
     loadGifts();
     
     // Обработчики событий
     addBtn.addEventListener('click', addGift);
+    giftName.addEventListener('keypress', (e) => e.key === 'Enter' && addGift());
+    clearBtn.addEventListener('click', clearForm);
+    giftPhoto.addEventListener('change', handlePhotoUpload);
     
-    giftName.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            addGift();
-        }
+    // Обработчики фильтров
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => setFilter(btn.dataset.filter));
     });
     
-    clearBtn.addEventListener('click', clearForm);
-    
-    // Обработчики для фильтров
-    filterBtns.forEach(btn => {
+    // Закрытие модальных окон
+    closeModal.forEach(btn => {
         btn.addEventListener('click', () => {
-            setFilter(btn.dataset.filter);
+            modal.style.display = 'none';
+            fullImageModal.style.display = 'none';
         });
     });
     
-    // Закрытие модального окна
-    closeModal.addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
-    
-    // Закрытие модального окна при клике вне его
     window.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.style.display = 'none';
-        }
+        if (e.target === modal) modal.style.display = 'none';
+        if (e.target === fullImageModal) fullImageModal.style.display = 'none';
     });
     
-    // Закрытие модального окна клавишей ESC
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modal.style.display === 'flex') {
-            modal.style.display = 'none';
+        if (e.key === 'Escape') {
+            if (modal.style.display === 'flex') modal.style.display = 'none';
+            if (fullImageModal.style.display === 'flex') fullImageModal.style.display = 'none';
         }
     });
-    
-    // Отмена таймера проверки подключения
-    setTimeout(() => {
-        clearTimeout(connectionTimeout);
-    }, 5000);
 }
 
-// Запуск приложения
+// Запуск
 document.addEventListener('DOMContentLoaded', init);
-
-// Добавляем обработчик для offline/online
-window.addEventListener('online', () => {
-    console.log('Соединение восстановлено');
-    loadGifts();
-});
-
-window.addEventListener('offline', () => {
-    console.log('Соединение потеряно');
-    giftsContainer.innerHTML = '<div class="error">Отсутствует интернет-соединение</div>';
-});
