@@ -3,76 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Наш Список Подарков</title>
+    <title>Наш Вишлист | Ахиллесушка и Аяночка</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎁</text></svg>">
 </head>
-<div id="connection-status" style="display: none; position: fixed; bottom: 20px; right: 20px; background: #ff6b6b; color: white; padding: 10px 15px; border-radius: 5px; z-index: 1000;">
-    Нет соединения с интернетом
-</div>
 <body>
     <div class="container">
         <header>
-            <h1><i class="fas fa-gift"></i> Наш Список Подарков</h1>
-            <p class="subtitle">Место, где мы храним идеи для подарков друг для друга</p>
+            <h1><i class="fas fa-heart"></i> Наш Вишлист</h1>
+            <p class="subtitle">Ахиллесушка 💙 и Аяночка 💖</p>
         </header>
 
         <div class="controls">
             <div class="filter-section">
                 <button class="filter-btn active" data-filter="all">Все подарки</button>
-                <button class="filter-btn" data-filter="user1">Подарки для Ахиллеса</button>
-                <button class="filter-btn" data-filter="user2">Подарки для Аяночки</button>
-                <button class="filter-btn" data-filter="priority">Приоритетные</button>
+                <button class="filter-btn" data-filter="user1">Для Ахиллеса</button>
+                <button class="filter-btn" data-filter="user2">Для Аяночки</button>
+                <button class="filter-btn" data-filter="priority">Важные ❤️</button>
             </div>
             
             <div class="add-gift-form">
                 <div class="form-row">
                     <select id="user-select">
-                        <option value="user1">Ахиллесушка</option>
-                        <option value="user2">Аяночка</option>
+                        <option value="user1">🎁 Для Ахиллеса</option>
+                        <option value="user2">🎀 Для Аяночки</option>
                     </select>
                     
                     <select id="category-select">
-                        <option value="">Категория (опционально)</option>
-                        <option value="Одежда">Одежда</option>
-                        <option value="Электроника">Электроника</option>
-                        <option value="Косметика">Косметика</option>
-                        <option value="Книги">Книги</option>
-                        <option value="Для дома">Для дома</option>
-                        <option value="Хобби">Хобби</option>
-                        <option value="Другое">Другое</option>
+                        <option value="">Категория</option>
+                        <option value="Одежда">👕 Одежда</option>
+                        <option value="Электроника">📱 Электроника</option>
+                        <option value="Косметика">💄 Косметика</option>
+                        <option value="Книги">📚 Книги</option>
+                        <option value="Для дома">🏠 Для дома</option>
+                        <option value="Хобби">🎨 Хобби</option>
+                        <option value="Другое">🎯 Другое</option>
                     </select>
                     
                     <select id="priority-select">
-                        <option value="normal">Обычный приоритет</option>
-                        <option value="high">Высокий приоритет</option>
-                        <option value="low">Низкий приоритет</option>
+                        <option value="normal">⭐ Обычный</option>
+                        <option value="high">❤️ Важный</option>
+                        <option value="low">🌱 Не срочно</option>
                     </select>
                 </div>
                 
                 <div class="form-row">
                     <input type="text" id="gift-name" placeholder="Название подарка *" required>
-                    <input type="text" id="gift-price" placeholder="Примерная цена (руб.)">
+                    <input type="text" id="gift-price" placeholder="Цена (руб.)">
                 </div>
                 
                 <div class="form-row">
                     <input type="url" id="gift-link" placeholder="Ссылка на товар (если есть)">
-                    <input type="text" id="gift-color" placeholder="Цвет/размер (если важно)">
+                    <input type="text" id="gift-color" placeholder="Цвет / Размер">
                 </div>
                 
                 <div class="form-row">
-                    <textarea id="gift-description" placeholder="Описание подарка, почему хочется, особенности..."></textarea>
+                    <!-- ВМЕСТО ОПИСАНИЯ - ЗАГРУЗКА ФОТО -->
+                    <div class="photo-upload-section">
+                        <div class="photo-upload">
+                            <label for="gift-photo">
+                                <i class="fas fa-camera"></i> Добавить фото подарка
+                            </label>
+                            <input type="file" id="gift-photo" accept="image/*" style="display: none;">
+                            <div id="photo-preview"></div>
+                        </div>
+                        <div class="photo-hint">
+                            <small>Можно загрузить фото вместо описания</small>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-actions">
-                        <button id="add-btn"><i class="fas fa-plus-circle"></i> Добавить в список</button>
-                        <button id="clear-btn"><i class="fas fa-broom"></i> Очистить форму</button>
+                        <button id="add-btn"><i class="fas fa-plus-circle"></i> Добавить подарок</button>
+                        <button id="clear-btn"><i class="fas fa-broom"></i> Очистить</button>
                     </div>
                 </div>
             </div>
         </div>
-                
 
         <div class="stats">
             <div class="stat-card">
@@ -90,17 +99,16 @@
         </div>
 
         <div class="gifts-container">
-            <div class="loading">Загрузка списка подарков...</div>
-            <!-- Сюда будут добавляться подарки через JavaScript -->
+            <div class="loading">Загрузка подарков...</div>
         </div>
 
         <footer>
             <p>Создано с любовью для нашего удобства <i class="fas fa-heart"></i></p>
-            <p class="hint">Кликните на подарок, чтобы посмотреть подробности. Используйте фильтры для навигации.</p>
+            <p class="hint">💡 Нажмите на подарок, чтобы увидеть фото</p>
         </footer>
     </div>
 
-    <!-- Модальное окно для подробного просмотра -->
+    <!-- Модальное окно для фото -->
     <div class="modal" id="gift-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -108,13 +116,19 @@
                 <button class="close-modal">&times;</button>
             </div>
             <div class="modal-body">
-                <!-- Содержимое будет заполняться JavaScript -->
+                <!-- Содержимое заполняется JavaScript -->
             </div>
         </div>
     </div>
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <!-- Модальное окно для полноразмерного фото -->
+    <div class="modal full-image-modal" id="full-image-modal">
+        <div class="modal-content image-modal-content">
+            <button class="close-modal">&times;</button>
+            <img id="full-image" src="" alt="Полное фото">
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
