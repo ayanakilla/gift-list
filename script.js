@@ -17,6 +17,7 @@ const giftName = document.getElementById('gift-name');
 const giftPrice = document.getElementById('gift-price');
 const giftLink = document.getElementById('gift-link');
 const giftColor = document.getElementById('gift-color');
+const giftDescription = document.getElementById('gift-description');
 const giftPhoto = document.getElementById('gift-photo');
 const photoPreview = document.getElementById('photo-preview');
 
@@ -30,7 +31,7 @@ let currentFilter = 'all';
 let currentPhoto = null;
 
 // Загрузка данных из LocalStorage
-const STORAGE_KEY = 'our-wishlist-v2';
+const STORAGE_KEY = 'our-wishlist-v3';
 
 function loadFromStorage() {
     try {
@@ -112,20 +113,24 @@ function createGiftElement(gift) {
     let photoHtml = '';
     if (gift.photo) {
         photoHtml = `
-            <div class="gift-image-preview" data-image="${gift.photo}">
-                <img src="${gift.photo}" alt="${gift.name}" onclick="openFullImage('${gift.photo}')">
+            <div class="gift-image-thumbnail" onclick="openFullImage('${gift.photo}')">
+                <img src="${gift.photo}" alt="${gift.name}">
             </div>
         `;
     } else {
         photoHtml = `
-            <div class="gift-image-preview">
-                <div class="image-placeholder">
-                    <i class="fas fa-gift"></i>
-                    <small>Нет фото</small>
+            <div class="gift-image-thumbnail">
+                <div class="no-photo">
+                    <i class="fas fa-image"></i>
                 </div>
             </div>
         `;
     }
+    
+    // Обрезаем описание
+    const shortDescription = gift.description && gift.description.length > 100 
+        ? gift.description.substring(0, 100) + '...' 
+        : gift.description || 'Описание отсутствует';
     
     giftCard.innerHTML = `
         <div class="gift-header">
@@ -135,10 +140,14 @@ function createGiftElement(gift) {
         ${gift.category ? `<div class="gift-category">${escapeHtml(gift.category)}</div>` : ''}
         ${gift.price ? `<div class="gift-price">${formatPrice(gift.price)} руб.</div>` : ''}
         
-        <!-- ФОТО ВМЕСТО ОПИСАНИЯ -->
+        <!-- ФОТО -->
         ${photoHtml}
         
+        <!-- ОПИСАНИЕ -->
+        <div class="gift-description-short">${escapeHtml(shortDescription)}</div>
+        
         ${gift.link ? `<a href="${gift.link}" target="_blank" class="gift-link" onclick="event.stopPropagation()"><i class="fas fa-external-link-alt"></i> Ссылка на товар</a>` : ''}
+        
         <div class="gift-actions">
             <button class="action-btn purchased-btn" data-id="${gift.id}">
                 <i class="fas fa-${gift.purchased ? 'undo' : 'shopping-cart'}"></i>
@@ -152,7 +161,8 @@ function createGiftElement(gift) {
     
     // Обработчики
     giftCard.addEventListener('click', (e) => {
-        if (!e.target.closest('.gift-actions') && !e.target.closest('.gift-link') && !e.target.closest('.gift-image-preview img')) {
+        if (!e.target.closest('.gift-actions') && !e.target.closest('.gift-link') && 
+            !e.target.closest('.gift-image-thumbnail')) {
             openGiftModal(gift);
         }
     });
@@ -203,13 +213,6 @@ function openGiftModal(gift) {
                 <img src="${gift.photo}" alt="${gift.name}" class="modal-image" onclick="openFullImage('${gift.photo}')" style="cursor: pointer;">
             </div>
         `;
-    } else {
-        photoModalHtml = `
-            <div class="modal-image-container" style="background: #f5f5f5; padding: 20px; border-radius: 10px; text-align: center;">
-                <i class="fas fa-gift" style="font-size: 3rem; color: #ddd;"></i>
-                <p style="color: #999; margin-top: 10px;">Фото не добавлено</p>
-            </div>
-        `;
     }
     
     modalBody.innerHTML = `
@@ -247,6 +250,10 @@ function openGiftModal(gift) {
                 <div class="detail-label">Дата:</div>
                 <div class="detail-value">${date}</div>
             </div>
+            <div class="detail-row" style="flex-direction: column;">
+                <div class="detail-label">Описание:</div>
+                <div class="detail-value" style="margin-top: 5px; white-space: pre-line;">${escapeHtml(gift.description || 'Описание отсутствует')}</div>
+            </div>
             ${gift.link ? `<div class="detail-row">
                 <div class="detail-label">Ссылка:</div>
                 <div class="detail-value">
@@ -280,7 +287,8 @@ function addGift() {
         price: giftPrice.value.trim() || null,
         link: giftLink.value.trim() || null,
         color: giftColor.value.trim() || null,
-        photo: currentPhoto, // Сохраняем фото вместо описания
+        description: giftDescription.value.trim() || null,
+        photo: currentPhoto, // Дополнительное фото
         purchased: false,
         date: new Date().toISOString()
     };
@@ -297,6 +305,7 @@ function clearForm() {
     giftPrice.value = '';
     giftLink.value = '';
     giftColor.value = '';
+    giftDescription.value = '';
     photoPreview.innerHTML = '';
     currentPhoto = null;
     categorySelect.selectedIndex = 0;
@@ -326,8 +335,8 @@ function handlePhotoUpload(event) {
         
         photoPreview.innerHTML = `
             <img src="${currentPhoto}" class="preview-image" alt="Предпросмотр">
-            <button type="button" class="remove-photo" onclick="removePhoto()">
-                <i class="fas fa-times"></i> Удалить фото
+            <button type="button" class="remove-photo-btn" onclick="removePhoto()">
+                <i class="fas fa-times"></i> Удалить
             </button>
         `;
     };
@@ -364,6 +373,7 @@ function deleteGift(id) {
 
 // Вспомогательные функции
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
