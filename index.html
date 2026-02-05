@@ -59,25 +59,23 @@
                 </div>
                 
                 <div class="form-row">
-                    <!-- ВМЕСТО ОПИСАНИЯ - ЗАГРУЗКА ФОТО -->
-                    <div class="photo-upload-section">
-                        <div class="photo-upload">
-                            <label for="gift-photo">
-                                <i class="fas fa-camera"></i> Добавить фото подарка
-                            </label>
-                            <input type="file" id="gift-photo" accept="image/*" style="display: none;">
-                            <div id="photo-preview"></div>
-                        </div>
-                        <div class="photo-hint">
-                            <small>Можно загрузить фото вместо описания</small>
-                        </div>
+                    <!-- ОПИСАНИЕ (как было) -->
+                    <textarea id="gift-description" placeholder="Описание подарка, почему хочется..."></textarea>
+                    
+                    <!-- КОМПАКТНАЯ КНОПКА ДЛЯ ФОТО -->
+                    <div class="photo-upload-compact">
+                        <label for="gift-photo" class="photo-btn">
+                            <i class="fas fa-camera"></i> Добавить фото
+                        </label>
+                        <input type="file" id="gift-photo" accept="image/*" style="display: none;">
+                        <div id="photo-preview" class="compact-preview"></div>
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-actions">
                         <button id="add-btn"><i class="fas fa-plus-circle"></i> Добавить подарок</button>
-                        <button id="clear-btn"><i class="fas fa-broom"></i> Очистить</button>
+                        <button id="clear-btn"><i class="fas fa-broom"></i> Очистить форму</button>
                     </div>
                 </div>
             </div>
@@ -104,11 +102,11 @@
 
         <footer>
             <p>Создано с любовью для нашего удобства <i class="fas fa-heart"></i></p>
-            <p class="hint">💡 Нажмите на подарок, чтобы увидеть фото</p>
+            <p class="hint">💡 Нажмите на подарок, чтобы увидеть фото и подробности</p>
         </footer>
     </div>
 
-    <!-- Модальное окно для фото -->
+    <!-- Модальное окно -->
     <div class="modal" id="gift-modal">
         <div class="modal-content">
             <div class="modal-header">
