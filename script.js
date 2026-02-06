@@ -1,3 +1,18 @@
+// Конфигурация Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyAQaE-RUlP-9l9KqUPUV_2pNpON7Oat9NY",
+    authDomain: "wishlistforayanakilla.firebaseapp.com",
+    projectId: "wishlistforayanakilla",
+    storageBucket: "wishlistforayanakilla.firebasestorage.app",
+    messagingSenderId: "974705587471",
+    appId: "1:974705587471:web:640be35d883f65fddbfa7a",
+    measurementId: "G-XWR9K2VE37"
+};
+
+// Инициализация Firebase
+let db = null;
+let unsubscribe = null;
+
 // Элементы DOM
 const giftsContainer = document.querySelector('.gifts-container');
 const addBtn = document.getElementById('add-btn');
@@ -30,27 +45,85 @@ const user2GiftsEl = document.getElementById('user2-gifts');
 let currentFilter = 'all';
 let currentPhoto = null;
 
-// Загрузка данных из LocalStorage
-const STORAGE_KEY = 'our-wishlist-v3';
-
-function loadFromStorage() {
+// Инициализация Firebase
+function initializeFirebase() {
     try {
-        const data = localStorage.getItem(STORAGE_KEY);
-        return data ? JSON.parse(data) : [];
-    } catch (e) {
-        return [];
+        // Проверяем, что Firebase загружен
+        if (typeof firebase === 'undefined') {
+            console.error("Firebase не загружен");
+            showError("Ошибка загрузки Firebase");
+            return false;
+        }
+        
+        // Инициализируем
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        console.log("Firebase успешно инициализирован");
+        
+        // Загружаем данные
+        loadGifts();
+        return true;
+    } catch (error) {
+        console.error("Ошибка инициализации Firebase:", error);
+        showError("Ошибка подключения к базе данных");
+        return false;
     }
 }
 
-function saveToStorage(gifts) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(gifts));
+// Показать ошибку
+function showError(message) {
+    giftsContainer.innerHTML = `
+        <div class="error" style="text-align: center; padding: 40px; color: #ff6b6b; background: rgba(255, 107, 107, 0.1); border-radius: 10px;">
+            <h3>${message}</h3>
+            <p>Попробуйте обновить страницу</p>
+            <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #6a11cb; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Обновить страницу
+            </button>
+        </div>
+    `;
 }
 
-// Загрузка подарков
+// Загрузка подарков из Firebase
 function loadGifts() {
-    const gifts = loadFromStorage();
-    displayGifts(gifts);
-    updateStats(gifts);
+    if (!db) {
+        showError("База данных не инициализирована");
+        return;
+    }
+    
+    // Отписываемся от предыдущего слушателя
+    if (unsubscribe) {
+        unsubscribe();
+    }
+    
+    // Создаем запрос
+    let query = db.collection('gifts').orderBy('date', 'desc');
+    
+    // Применяем фильтр
+    if (currentFilter === 'user1' || currentFilter === 'user2') {
+        query = query.where('user', '==', currentFilter);
+    } else if (currentFilter === 'priority') {
+        query = query.where('priority', '==', 'high');
+    }
+    
+    // Показываем загрузку
+    giftsContainer.innerHTML = '<div class="loading">Загрузка подарков...</div>';
+    
+    // Подписываемся на изменения в реальном времени
+    unsubscribe = query.onSnapshot((snapshot) => {
+        const gifts = [];
+        snapshot.forEach((doc) => {
+            gifts.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        displayGifts(gifts);
+        updateStats(gifts);
+    }, (error) => {
+        console.error("Ошибка загрузки:", error);
+        showError("Ошибка загрузки данных");
+    });
 }
 
 // Обновление статистики
@@ -66,16 +139,8 @@ function updateStats(gifts) {
 
 // Отображение подарков
 function displayGifts(gifts) {
-    // Фильтрация
-    let filteredGifts = gifts;
-    if (currentFilter === 'user1' || currentFilter === 'user2') {
-        filteredGifts = gifts.filter(g => g.user === currentFilter);
-    } else if (currentFilter === 'priority') {
-        filteredGifts = gifts.filter(g => g.priority === 'high');
-    }
-    
     // Сортировка
-    filteredGifts.sort((a, b) => {
+    gifts.sort((a, b) => {
         if (a.priority === 'high' && b.priority !== 'high') return -1;
         if (a.priority !== 'high' && b.priority === 'high') return 1;
         if (a.purchased && !b.purchased) return 1;
@@ -87,14 +152,14 @@ function displayGifts(gifts) {
     giftsContainer.innerHTML = '';
     
     // Если нет подарков
-    if (filteredGifts.length === 0) {
+    if (gifts.length === 0) {
         const message = getEmptyMessage();
         giftsContainer.innerHTML = `<div class="empty-state">${message}</div>`;
         return;
     }
     
     // Добавление каждого подарка
-    filteredGifts.forEach(gift => {
+    gifts.forEach(gift => {
         const giftElement = createGiftElement(gift);
         giftsContainer.appendChild(giftElement);
     });
@@ -113,8 +178,8 @@ function createGiftElement(gift) {
     let photoHtml = '';
     if (gift.photo) {
         photoHtml = `
-            <div class="gift-image-thumbnail" onclick="openFullImage('${gift.photo}')">
-                <img src="${gift.photo}" alt="${gift.name}">
+            <div class="gift-image-thumbnail" onclick="openFullImage('${escapeHtml(gift.photo)}')">
+                <img src="${gift.photo}" alt="${escapeHtml(gift.name)}">
             </div>
         `;
     } else {
@@ -169,7 +234,7 @@ function createGiftElement(gift) {
     
     giftCard.querySelector('.purchased-btn').addEventListener('click', (e) => {
         e.stopPropagation();
-        togglePurchaseStatus(gift.id);
+        togglePurchaseStatus(gift.id, gift.purchased);
     });
     
     giftCard.querySelector('.delete-btn').addEventListener('click', (e) => {
@@ -197,20 +262,20 @@ function openGiftModal(gift) {
     };
     
     const priorityLabel = priorityLabels[gift.priority] || 'Не указан';
-    const date = new Date(gift.date).toLocaleDateString('ru-RU', {
+    const date = gift.date ? new Date(gift.date).toLocaleDateString('ru-RU', {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
-    });
+    }) : 'Дата не указана';
     
     // Фото для модального окна
     let photoModalHtml = '';
     if (gift.photo) {
         photoModalHtml = `
             <div class="modal-image-container">
-                <img src="${gift.photo}" alt="${gift.name}" class="modal-image" onclick="openFullImage('${gift.photo}')" style="cursor: pointer;">
+                <img src="${gift.photo}" alt="${escapeHtml(gift.name)}" class="modal-image" onclick="openFullImage('${escapeHtml(gift.photo)}')" style="cursor: pointer;">
             </div>
         `;
     }
@@ -268,8 +333,13 @@ function openGiftModal(gift) {
     modal.style.display = 'flex';
 }
 
-// Добавление подарка
-function addGift() {
+// Добавление подарка в Firebase
+async function addGift() {
+    if (!db) {
+        alert('База данных не доступна');
+        return;
+    }
+    
     const name = giftName.value.trim();
     if (!name) {
         alert('Введите название подарка');
@@ -277,9 +347,7 @@ function addGift() {
         return;
     }
     
-    const gifts = loadFromStorage();
     const newGift = {
-        id: Date.now(),
         name: name,
         user: userSelect.value,
         category: categorySelect.value || null,
@@ -293,10 +361,14 @@ function addGift() {
         date: new Date().toISOString()
     };
     
-    gifts.push(newGift);
-    saveToStorage(gifts);
-    clearForm();
-    loadGifts();
+    try {
+        await db.collection('gifts').add(newGift);
+        clearForm();
+        // Не нужно вызывать loadGifts() - сработает автоматически через onSnapshot
+    } catch (error) {
+        console.error('Ошибка добавления:', error);
+        alert('Ошибка при добавлении подарка');
+    }
 }
 
 // Очистка формы
@@ -350,25 +422,42 @@ window.removePhoto = function() {
     giftPhoto.value = '';
 }
 
-// Переключение статуса покупки
-function togglePurchaseStatus(id) {
-    const gifts = loadFromStorage();
-    const index = gifts.findIndex(g => g.id === id);
-    if (index !== -1) {
-        gifts[index].purchased = !gifts[index].purchased;
-        saveToStorage(gifts);
-        loadGifts();
+// Переключение статуса покупки в Firebase
+async function togglePurchaseStatus(id, currentStatus) {
+    if (!db) {
+        alert('База данных не доступна');
+        return;
+    }
+    
+    try {
+        await db.collection('gifts').doc(id).update({
+            purchased: !currentStatus
+        });
+        // Не нужно вызывать loadGifts() - сработает автоматически
+    } catch (error) {
+        console.error('Ошибка обновления:', error);
+        alert('Не удалось обновить статус подарка');
     }
 }
 
-// Удаление подарка
-function deleteGift(id) {
-    if (!confirm('Удалить этот подарок из списка?')) return;
+// Удаление подарка из Firebase
+async function deleteGift(id) {
+    if (!db) {
+        alert('База данных не доступна');
+        return;
+    }
     
-    const gifts = loadFromStorage();
-    const filtered = gifts.filter(g => g.id !== id);
-    saveToStorage(filtered);
-    loadGifts();
+    if (!confirm('Удалить этот подарок из списка?')) {
+        return;
+    }
+    
+    try {
+        await db.collection('gifts').doc(id).delete();
+        // Не нужно вызывать loadGifts() - сработает автоматически
+    } catch (error) {
+        console.error('Ошибка удаления:', error);
+        alert('Не удалось удалить подарок');
+    }
 }
 
 // Вспомогательные функции
@@ -406,8 +495,10 @@ function setFilter(filter) {
 
 // Инициализация
 function init() {
-    // Загрузка данных
-    loadGifts();
+    // Инициализируем Firebase
+    setTimeout(() => {
+        initializeFirebase();
+    }, 100);
     
     // Обработчики событий
     addBtn.addEventListener('click', addGift);
@@ -443,3 +534,16 @@ function init() {
 
 // Запуск
 document.addEventListener('DOMContentLoaded', init);
+
+// Добавляем обработчик для offline/online
+window.addEventListener('online', () => {
+    console.log('Соединение восстановлено');
+    if (db) {
+        loadGifts();
+    }
+});
+
+window.addEventListener('offline', () => {
+    console.log('Соединение потеряно');
+    showError('Отсутствует интернет-соединение');
+});
